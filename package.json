@@ -1,0 +1,16 @@
+{
+  "name": "shrill-base-8903",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy --minify",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+  },
+  "dependencies": {
+    "hono": "^4.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "wrangler": "^4.119.0"
+  }
+}
