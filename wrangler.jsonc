@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "shrill-base-8903",
+	"name": "shopping-list2-worker",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-08-05",
 	"assets": {
