@@ -51,6 +51,7 @@ app.get("/message", (c) => {
 app.post("/update-product", async (c) => {
   const form = await c.req.formData();
 
+  const id = form.get("id")?.toString() || null;
   const name = form.get("name")?.toString();
   const price = form.get("price")?.toString();
   const category = form.get("category")?.toString();
@@ -60,8 +61,8 @@ app.post("/update-product", async (c) => {
   const image = form.get("image") as File | null;
 
   const item = await c.env.shopping_list
-    .prepare("SELECT * FROM products WHERE barcode = ?")
-    .bind(barcode)
+    .prepare("SELECT * FROM products WHERE id = ?")
+    .bind(id)
     .first<Product>();
 
   const supabase = createClient(
@@ -309,16 +310,16 @@ app.post("/getitembybarcode", async (c) => {
   const barcode = await c.req.text();
 
   try {
-    const item = await c.env.shopping_list
+    const items = await c.env.shopping_list
       .prepare("SELECT * FROM products WHERE barcode = ?")
       .bind(barcode)
-      .first();
+      .all();
 
-    if (!item) {
+    if (!items) {
       return c.json({ ok: true, message: "NO_ITEM_FOUND" }, 404);
     }
 
-    return c.json({ ok: true, message: "ITEM_FOUND", item });
+    return c.json({ ok: true, message: "ITEM_FOUND", items: items.results });
   } catch (error) {
     console.log(error);
     return c.json({ ok: false, message: "INTERNAL_SERVER_ERROR", error }, 500);
