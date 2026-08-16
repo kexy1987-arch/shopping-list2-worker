@@ -1,16 +1,20 @@
 {
-  "name": "shrill-base-8903",
+  "name": "shopping-list2-worker",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy --minify",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "deploy": "wrangler deploy",
+    "start": "wrangler dev"
   },
   "dependencies": {
-    "hono": "^4.13.0"
+    "hono": "^4.0.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
-    "@types/node": "^26.1.2",
-    "wrangler": "^4.119.0"
+    "wrangler": "^3.0.0",
+    "typescript": "^5.0.0",
+    "@cloudflare/workers-types": "^4.20240512.0"
   }
 }

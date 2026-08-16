@@ -1,9 +1,328 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { createClient } from "@supabase/supabase-js";
+import bcrypt from "bcryptjs";
+import type {
+  CloudflareBindings,
+  NewUser,
+  LoginUser,
+  DBUser,
+  Product,
+  UpdateProductForm,
+  UserList,
+  UpdateListBody,
+  GetMyListItemsBody,
+  BarcodeLookup
+} from "./types";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
+// -----------------------------
+// CORS
+// -----------------------------
+app.use(
+  "*",
+  cors({
+    origin: (origin) => {
+      if (!origin) return "null";
+      if (origin.startsWith("http://localhost")) return origin;
+      if (origin.startsWith("http://127.0.0.1")) return origin;
+      if (origin.startsWith("http://192.168.")) return origin;
+      if (origin.endsWith(".local:5173")) return origin;
+      if (origin === "https://shopping-list2.pages.dev") return origin;
+      return "null";
+    },
+    allowHeaders: ["Content-Type", "Authorization"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+  })
+);
+
+// -----------------------------
+// Test route
+// -----------------------------
 app.get("/message", (c) => {
-  return c.text("Hello Hono!");
+  return c.json({ message: "Hello Hono!" });
+});
+
+// -----------------------------
+// Update or insert product
+// -----------------------------
+app.post("/update-product", async (c) => {
+  const form = await c.req.formData();
+
+  const name = form.get("name")?.toString();
+  const price = form.get("price")?.toString();
+  const category = form.get("category")?.toString();
+  const store = form.get("store")?.toString();
+  const description = form.get("description")?.toString();
+  const barcode = form.get("barcode")?.toString();
+  const image = form.get("image") as File | null;
+
+  const item = await c.env.shopping_list
+    .prepare("SELECT * FROM products WHERE barcode = ?")
+    .bind(barcode)
+    .first<Product>();
+
+  const supabase = createClient(
+    c.env.SUPABASE_URL,
+    c.env.SUPABASE_SERVICE_KEY
+  );
+
+  const ext = image?.name.split(".").pop() || "jpg";
+  const fileName = `${name}-${Date.now()}-${crypto.randomUUID()}.${ext}`;
+  const imageUrl =
+    `https://isdtokzfuppyibdyevtu.supabase.co/storage/v1/object/public/white-stone-userimg/${fileName}`;
+
+  // UPDATE
+  if (item) {
+    await c.env.shopping_list
+      .prepare(
+        "UPDATE products SET name = ?, price = ?, category = ?, description = ? WHERE barcode = ?"
+      )
+      .bind(name, price, category, description, barcode)
+      .run();
+
+    if (image) {
+      const oldUrl = item.image_url;
+      const oldFileName = oldUrl.split("/").pop();
+
+      const { error } = await supabase.storage
+        .from(c.env.SUPABASE_BUCKET)
+        .upload(oldFileName!, image, {
+          contentType: `image/${ext}`,
+          upsert: true,
+        });
+
+      if (error) {
+        return c.json({ ok: false, message: "IMAGE_UPLOAD_FAILED", error });
+      }
+    }
+
+    return c.json({ ok: true, message: "ITEM_UPDATED" });
+  }
+
+  // INSERT
+  try {
+    await c.env.shopping_list
+      .prepare(
+        "INSERT INTO products(name, price, category, store, description, barcode, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      )
+      .bind(name, price, category, store, description, barcode, imageUrl)
+      .run();
+
+    if (image) {
+      await supabase.storage
+        .from(c.env.SUPABASE_BUCKET)
+        .upload(fileName, image, {
+          contentType: `image/${ext}`,
+        });
+    }
+
+    return c.json({ ok: true, message: "Product added to the global list." });
+  } catch (err) {
+    console.log(err);
+    return c.json({ ok: false, message: "Something went wrong" }, 500);
+  }
+});
+
+// -----------------------------
+// Get all products
+// -----------------------------
+app.get("/get-products", async (c) => {
+  try {
+    const products = await c.env.shopping_list
+      .prepare("SELECT * FROM products")
+      .run();
+
+    return c.json({ ok: true, list: products.results });
+  } catch (err) {
+    console.log(err);
+    return c.json({ ok: false }, 500);
+  }
+});
+
+// -----------------------------
+// Create new account
+// -----------------------------
+app.post("/newacc", async (c) => {
+  const { email, first_name, last_name, password } = await c.req.json();
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  try {
+    await c.env.shopping_list
+      .prepare(
+        "INSERT INTO users(email, first_name, last_name, password_hash) VALUES (?, ?, ?, ?)"
+      )
+      .bind(email, first_name, last_name, passwordHash)
+      .run();
+
+    return c.json({ ok: true, message: "Account successfully created!" });
+  } catch (err) {
+    console.log(err);
+    const message = String(err);
+
+    if (message.includes("UNIQUE constraint failed")) {
+      return c.json({ ok: false, error: "USER_EXISTS" });
+    }
+
+    return c.json({ ok: false, error: err });
+  }
+});
+
+// -----------------------------
+// Login
+// -----------------------------
+app.post("/login", async (c) => {
+  const { email, password } = await c.req.json();
+
+  try {
+    const selectedUser = await c.env.shopping_list
+      .prepare(
+        "SELECT id, email, first_name, last_name, password_hash FROM users WHERE email = ?"
+      )
+      .bind(email)
+      .first<DBUser>();
+
+    if (!selectedUser) {
+      return c.json({ ok: false, error: "USER_NOT_EXIST" }, 404);
+    }
+
+    const isValid = await bcrypt.compare(password, selectedUser.password_hash);
+
+    if (!isValid) {
+      return c.json({ ok: false, error: "INVALID_PASSWORD" }, 401);
+    }
+
+    const token = selectedUser.first_name;
+
+    return c.json({ ok: true, user: selectedUser, token });
+  } catch (err) {
+    console.log(err);
+    return c.json({ ok: false, error: "UNKNOWN_ERROR" }, 500);
+  }
+});
+
+// -----------------------------
+// Get user's list
+// -----------------------------
+app.post("/my-list", async (c) => {
+  const userId = await c.req.json();
+
+  const myList = await c.env.shopping_list
+    .prepare("SELECT list FROM user_list WHERE user_id = ?")
+    .bind(userId)
+    .first();
+
+  if (!myList) {
+    return c.json({ ok: false, message: "LIST_NOT_EXISTS" }, 404);
+  }
+
+  return c.json({ ok: true, data: myList }, 200);
+});
+
+// -----------------------------
+// Update user's list
+// -----------------------------
+app.post("/update-list", async (c) => {
+  const { user_id, list } = await c.req.json();
+
+  const listString = JSON.stringify(list);
+
+  const myList = await c.env.shopping_list
+    .prepare("SELECT list FROM user_list WHERE user_id = ?")
+    .bind(user_id)
+    .first();
+
+  try {
+    if (myList) {
+      await c.env.shopping_list
+        .prepare("UPDATE user_list SET list = ? WHERE user_id = ?")
+        .bind(listString, user_id)
+        .run();
+
+      return c.json({ ok: true, message: "LIST_UPDATED" });
+    }
+
+    await c.env.shopping_list
+      .prepare("INSERT INTO user_list (user_id, list) VALUES (?, ?)")
+      .bind(user_id, listString)
+      .run();
+
+    return c.json({ ok: true, message: "LIST_CREATED" });
+  } catch (error) {
+    console.log(error);
+    return c.json({ ok: false, message: "SERVER_ERROR", error }, 500);
+  }
+});
+
+// -----------------------------
+// Get stores
+// -----------------------------
+app.get("/getstores", async (c) => {
+  try {
+    const stores = await c.env.shopping_list
+      .prepare("SELECT DISTINCT store FROM products")
+      .run();
+
+    return c.json({ ok: true, stores: stores.results });
+  } catch (error) {
+    return c.json({ ok: false, error }, 500);
+  }
+});
+
+// -----------------------------
+// Get items by ID list
+// -----------------------------
+app.post("/get-my-list-items", async (c) => {
+  const { idList, currentStore } = await c.req.json();
+
+  if (!idList || idList.length === 0) {
+    return c.json({ ok: true, data: [] });
+  }
+
+  const placeholders = idList.map(() => "?").join(", ");
+  let query = "";
+  const params: any[] = [...idList];
+
+  if (!currentStore || currentStore === "all") {
+    query = `SELECT * FROM products WHERE id IN (${placeholders})`;
+  } else {
+    query = `SELECT * FROM products WHERE id IN (${placeholders}) AND store = ?`;
+    params.push(currentStore);
+  }
+
+  try {
+    const row = await c.env.shopping_list.prepare(query).bind(...params).run();
+    return c.json({ ok: true, data: row.results });
+  } catch (error) {
+    console.log(error);
+    return c.json({ ok: false, error, message: "Something went wrong." }, 500);
+  }
+});
+
+// -----------------------------
+// Get item by barcode
+// -----------------------------
+app.post("/getitembybarcode", async (c) => {
+  const barcode = await c.req.text();
+
+  try {
+    const item = await c.env.shopping_list
+      .prepare("SELECT * FROM products WHERE barcode = ?")
+      .bind(barcode)
+      .first();
+
+    if (!item) {
+      return c.json({ ok: true, message: "NO_ITEM_FOUND" }, 404);
+    }
+
+    return c.json({ ok: true, message: "ITEM_FOUND", item });
+  } catch (error) {
+    console.log(error);
+    return c.json({ ok: false, message: "INTERNAL_SERVER_ERROR", error }, 500);
+  }
 });
 
 export default app;
