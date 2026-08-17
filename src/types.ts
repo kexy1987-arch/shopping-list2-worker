@@ -87,3 +87,9 @@ export type GetMyListItemsBody = {
 export type BarcodeLookup = {
     barcode: string;
 };
+
+export type User_List = {
+    user_id: number,
+    list: string,
+    favorites: string
+}

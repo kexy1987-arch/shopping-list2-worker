@@ -4,15 +4,9 @@ import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
 import type {
   CloudflareBindings,
-  NewUser,
-  LoginUser,
   DBUser,
   Product,
-  UpdateProductForm,
-  UserList,
-  UpdateListBody,
-  GetMyListItemsBody,
-  BarcodeLookup
+  User_List
 } from "./types";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
@@ -325,5 +319,81 @@ app.post("/getitembybarcode", async (c) => {
     return c.json({ ok: false, message: "INTERNAL_SERVER_ERROR", error }, 500);
   }
 });
+
+//------------------------
+//Update favorites
+//------------------------
+
+app.post("/addToFavorites", async (c) => {
+  const body = await c.req.json();
+  const { productId, userId } = body;
+  console.log(body)
+
+  try{
+    const row = await c.env.shopping_list
+      .prepare("SELECT favorites FROM user_list WHERE user_id = ?")
+      .bind(userId)
+      .first<User_List>()
+    
+    if(row){
+      const currentList: number[] = row.favorites ? JSON.parse(row.favorites) : [];
+      const exist = currentList.find(id => id === productId)
+      if(exist) {
+        return c.json({ok: true, message: "ALREADY_IN_THE_LIST"}, 409)
+      }
+      const list = [...currentList, productId];
+      const listString = JSON.stringify(list)
+
+      await c.env.shopping_list
+        .prepare("UPDATE user_list SET favorites = ? WHERE user_id =? ")
+        .bind(listString, userId)
+        .run()
+
+      return c.json({ ok: true, message: "FAVORITES_UPDATED" }, 200)
+    }
+
+    
+  } catch(error) {
+    console.log(error)
+    return c.json({ok: false, error: error}, 500)
+  }  
+})
+
+//-----------------------
+//Get Favorites Products
+//-----------------------
+
+app.post("/getFavoriteProducts", async (c) => {
+  const userId = await c.req.json();
+
+  try {
+    const favIDs = await c.env.shopping_list
+      .prepare("SELECT favorites FROM user_list WHERE user_id = ?")
+      .bind(userId)
+      .first<User_List>()
+
+    if(favIDs){
+      const favs: string[] = JSON.parse(favIDs.favorites);
+      const placeholders = favs.map(() => "?").join(", ");
+      const params: any[] = [...favs];
+      const query = `SELECT * FROM products WHERE id IN (${placeholders})`;
+
+      const favProducts = await c.env.shopping_list
+        .prepare(query)
+        .bind(...params)
+        .all()
+
+      const { results } = favProducts
+
+      return c.json({ok: true, results})
+    }
+    
+  }catch(error) {
+    console.log(error)
+    return c.json({ok: true, error: error}, 500)
+  }
+})
+
+
 
 export default app;
