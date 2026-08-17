@@ -321,7 +321,7 @@ app.post("/getitembybarcode", async (c) => {
 });
 
 //------------------------
-//Update favorites
+//Add to favorites
 //------------------------
 
 app.post("/addToFavorites", async (c) => {
@@ -357,6 +357,39 @@ app.post("/addToFavorites", async (c) => {
     console.log(error)
     return c.json({ok: false, error: error}, 500)
   }  
+})
+
+//-----------------------
+// Remove from favorite
+//-----------------------
+
+app.post("removeFavorite", async (c) => {
+  const { userId, productId } = await c.req.json();
+
+  try{
+    const favsRow = await c.env.shopping_list
+      .prepare("SELECT favorites FROM user_list WHERE user_id = ?")
+      .bind(userId)
+      .first<User_List>()
+
+    if (favsRow){
+      const favs: number[] = JSON.parse(favsRow.favorites);
+      const filtered = favs.filter(fav => fav !== productId);
+      const favsStr = JSON.stringify(filtered)
+
+      await c.env.shopping_list
+        .prepare("UPDATE user_list SET favorites = ? WHERE user_id = ?")
+        .bind(favsStr, userId)
+        .run()
+
+      return c.json({ok: true, message:"PRODUCT_REMOVED_FROM_FAVS"}, 200)
+    }
+    
+    return c.json({ok: false, error: "ROW_NOT_FOUND"}, 404);
+  } catch(error) {
+    console.log(error)
+    return c.json({ok: false, error: "INTERNAL_ERROR"}, 500)
+  }
 })
 
 //-----------------------
