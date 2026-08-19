@@ -125,10 +125,13 @@ app.post("/update-product", async (c) => {
 // -----------------------------
 // Get all products
 // -----------------------------
-app.get("/get-products", async (c) => {
+app.post("/get-products", async (c) => {
+  const country = await c.req.text();
+
   try {
     const products = await c.env.shopping_list
-      .prepare("SELECT * FROM products")
+      .prepare("SELECT * FROM products WHERE country = ?")
+      .bind(country)
       .run();
 
     return c.json({ ok: true, list: products.results });
