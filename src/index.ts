@@ -176,7 +176,7 @@ app.post("/login", async (c) => {
   try {
     const selectedUser = await c.env.shopping_list
       .prepare(
-        "SELECT id, email, first_name, last_name, password_hash FROM users WHERE email = ?"
+        "SELECT id, email, first_name, last_name, password_hash, country FROM users WHERE email = ?"
       )
       .bind(email)
       .first<DBUser>();
@@ -192,6 +192,7 @@ app.post("/login", async (c) => {
     }
 
     const token = selectedUser.first_name;
+
 
     return c.json({ ok: true, user: selectedUser, token });
   } catch (err) {
@@ -425,6 +426,26 @@ app.post("/getFavoriteProducts", async (c) => {
   }catch(error) {
     console.log(error)
     return c.json({ok: true, error: error}, 500)
+  }
+})
+
+//----------------------------
+// Change user country
+//----------------------------
+
+app.post("/updateCountry", async (c) => {
+  const {userId, country} = await c.req.json();
+
+  try{
+    await c.env.shopping_list
+      .prepare("UPDATE users SET country = ? WHERE id = ?")
+      .bind(country, userId)
+      .run()
+
+    return c.json({ok:true, message: "COUNTRY_UPDATED"}, 200)
+  } catch (error) {
+    console.log(error);
+    return c.json({ok:false}, 500);
   }
 })
 
