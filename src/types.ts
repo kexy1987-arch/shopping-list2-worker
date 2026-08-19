@@ -45,6 +45,8 @@ export type Product = {
     description: string;
     barcode: string;
     image_url: string;
+    country: string;
+    currency : string
 };
 
 // -----------------------------

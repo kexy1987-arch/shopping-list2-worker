@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
+import currencyMap from "./currencymap";
 import type {
   CloudflareBindings,
   DBUser,
@@ -132,9 +133,15 @@ app.post("/get-products", async (c) => {
     const products = await c.env.shopping_list
       .prepare("SELECT * FROM products WHERE country = ?")
       .bind(country)
-      .run();
+      .run<Product>();
 
-    return c.json({ ok: true, list: products.results });
+    const list = products.results.map((p) => ({
+      ...p,
+      currency: currencyMap(p.country)
+    }
+    ))
+
+    return c.json({ ok: true, list });
   } catch (err) {
     console.log(err);
     return c.json({ ok: false }, 500);
