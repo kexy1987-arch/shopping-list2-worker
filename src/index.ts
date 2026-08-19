@@ -36,7 +36,7 @@ app.use(
 // Test route
 // -----------------------------
 app.get("/message", (c) => {
-  return c.json({ message: "Hello Hono!" });
+  return c.json({ message: "Hello Shopping List!" });
 });
 
 // -----------------------------
@@ -53,6 +53,7 @@ app.post("/update-product", async (c) => {
   const description = form.get("description")?.toString();
   const barcode = form.get("barcode")?.toString();
   const image = form.get("image") as File | null;
+  const country = form.get("country");
 
   const item = await c.env.shopping_list
     .prepare("SELECT * FROM products WHERE id = ?")
@@ -73,9 +74,9 @@ app.post("/update-product", async (c) => {
   if (item) {
     await c.env.shopping_list
       .prepare(
-        "UPDATE products SET name = ?, price = ?, category = ?, description = ? WHERE barcode = ?"
+        "UPDATE products SET name = ?, price = ?, category = ?, description = ?, country = ? WHERE barcode = ?"
       )
-      .bind(name, price, category, description, barcode)
+      .bind(name, price, category, description, barcode, country)
       .run();
 
     if (image) {
@@ -101,9 +102,9 @@ app.post("/update-product", async (c) => {
   try {
     await c.env.shopping_list
       .prepare(
-        "INSERT INTO products(name, price, category, store, description, barcode, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO products(name, price, category, store, description, barcode, image_url, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
       )
-      .bind(name, price, category, store, description, barcode, imageUrl)
+      .bind(name, price, category, store, description, barcode, imageUrl, country)
       .run();
 
     if (image) {
