@@ -142,16 +142,16 @@ app.get("/get-products", async (c) => {
 // Create new account
 // -----------------------------
 app.post("/newacc", async (c) => {
-  const { email, first_name, last_name, password } = await c.req.json();
+  const { email, first_name, last_name, password, country } = await c.req.json();
 
   const passwordHash = await bcrypt.hash(password, 10);
 
   try {
     await c.env.shopping_list
       .prepare(
-        "INSERT INTO users(email, first_name, last_name, password_hash) VALUES (?, ?, ?, ?)"
+        "INSERT INTO users(email, first_name, last_name, password_hash, country) VALUES (?, ?, ?, ?, ?)"
       )
-      .bind(email, first_name, last_name, passwordHash)
+      .bind(email, first_name, last_name, passwordHash, country)
       .run();
 
     return c.json({ ok: true, message: "Account successfully created!" });
