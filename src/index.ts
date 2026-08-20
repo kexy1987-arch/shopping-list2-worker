@@ -124,6 +124,26 @@ app.post("/update-product", async (c) => {
 });
 
 // -----------------------------
+// Delete from all products
+// -----------------------------
+
+app.post("/deletefromall", async (c) => {
+   const { id } = await c.req.json()
+
+   try{
+    await c.env.shopping_list
+      .prepare("DELETE FROM products WHERE id = ?")
+      .bind(id)
+      .run();
+
+    return c.json({ok: true, message: "PRODUCT_DELETED"}, 200);
+   } catch(error) {
+    console.log(error);
+    return c.json({ok: false, message: "INTERNAL_ERROR"}, 500);
+   }
+})
+
+// -----------------------------
 // Get all products
 // -----------------------------
 app.post("/get-products", async (c) => {
