@@ -7,7 +7,8 @@ import type {
   CloudflareBindings,
   DBUser,
   Product,
-  User_List
+  User_List,
+  AzureOCRResponse
 } from "./types";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
@@ -477,6 +478,41 @@ app.post("/updateCountry", async (c) => {
     console.log(error);
     return c.json({ok:false}, 500);
   }
+})
+
+app.post("acureocr", async (c) => {
+  const formData = await c.req.formData();
+  const file = formData.get("file") as File;
+  if(file) {
+    try{
+      const azureAPI = c.env.VITE_AZURE_API;
+      const azureKey = c.env.VITE_AZURE_KEY;
+
+      const blob = file;
+      const url = `${azureAPI}/computervision/imageanalysis:analyze?features=read`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": file.type,
+          "Ocp-Apim-Subscription-Key": azureKey
+        },
+        body: blob
+      });
+      const data = await response.json() as AzureOCRResponse;
+
+      const lines = data.readResult?.blocks?.flatMap(b =>
+        b.lines.map(l => l.text)
+      ) || [];
+
+      const text = lines.join("\n")
+
+      return c.json({ ok: true, text }, 200);
+    } catch (error) {
+      console.log(error);
+      return c.json({ok: false, message: "INTERNAL_SERVER_ERROR"}, 500);
+    }    
+  }
+  return c.json({ok: false, message: "NO_CONTENT"}, 400)
 })
 
 
