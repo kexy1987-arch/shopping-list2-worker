@@ -539,6 +539,23 @@ app.post("/acureocr", async (c) => {
   return c.json({ok: false, message: "NO_CONTENT"}, 400)
 })
 
+app.post("/buy", async (c) => {
+  const { myList, userId } = await c.req.json();
+  
+  try {
+    const db = await c.env.shopping_list
+      .prepare("UPDATE user_list SET list = ? WHERE user_id = ?")
+      .bind(JSON.stringify(myList), userId)
+      .run();
+
+    if(!db) return c.json({ok: true, message: "NO_USERLIST_FOUND"}, 404);
+    return c.json({ok: true, message: "myList UPDATED"}, 200);
+  } catch (error){
+    console.log(error);
+    return c.json({ok: false, message: "INTERNAL_SERVER_ERROR"}, 500);
+  }
+})
+
 
 
 export default app;
