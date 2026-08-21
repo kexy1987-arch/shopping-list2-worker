@@ -480,17 +480,17 @@ app.post("/updateCountry", async (c) => {
   }
 })
 
-app.post("acureocr", async (c) => {
+app.post("/acureocr", async (c) => {
   const formData = await c.req.formData();
   const file = formData.get("file") as File;
   if(file) {
     try{
-      const azureAPI = c.env.VITE_AZURE_API;
-      const azureKey = c.env.VITE_AZURE_KEY;
+      const azureAPI = c.env.AZURE_API;
+      const azureKey = c.env.AZURE_KEY;
 
       const blob = file;
-      const url = `${azureAPI}/computervision/imageanalysis:analyze?features=read`;
-      const response = await fetch(url, {
+      const url = `${azureAPI}/vision/v3.2/read/analyze`;
+      const submitRes = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": file.type,
@@ -498,15 +498,37 @@ app.post("acureocr", async (c) => {
         },
         body: blob
       });
-      const data = await response.json() as AzureOCRResponse;
+      const operationUrl = submitRes.headers.get("operation-location")
+      if(!operationUrl){
+        return c.json({ok: false, message: "NO_OPERATIONAL_URL"}, 500);
+      }
 
-      const lines = data.readResult?.blocks?.flatMap(b =>
-        b.lines.map(l => l.text)
-      ) || [];
+      let result: AzureOCRResponse;
+      while (true) {
+        const pollRes = await fetch(operationUrl, {
+          headers: {
+            "Ocp-Apim-Subscription-Key": azureKey
+          }
+        });
 
-      const text = lines.join("\n")
+        result = await pollRes.json();
 
-      return c.json({ ok: true, text }, 200);
+        if (result.status === "succeeded") break;
+
+        // Wait 500ms before polling again
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      if ( result ){
+        const lines = result.analyzeResult?.readResults?.flatMap(b =>
+          b.lines.map(l => l.text)
+        ) || [];
+
+        const text = lines.join("\n")
+
+        return c.json({ ok: true, text }, 200);
+      }
+      
     } catch (error) {
       console.log(error);
       return c.json({ok: false, message: "INTERNAL_SERVER_ERROR"}, 500);

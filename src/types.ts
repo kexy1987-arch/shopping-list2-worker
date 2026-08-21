@@ -8,8 +8,8 @@ export type CloudflareBindings = {
     SUPABASE_URL: string;
     SUPABASE_SERVICE_KEY: string;
     SUPABASE_BUCKET: string;
-    VITE_AZURE_API: string;
-    VITE_AZURE_KEY: string;
+    AZURE_API: string;
+    AZURE_KEY: string;
 };
 
 // -----------------------------
@@ -106,12 +106,15 @@ export type AzureOCRLine = {
     text: string;
 };
 
-export type AzureOCRBlock = {
+export type AzureOCRReadResult = {
     lines: AzureOCRLine[];
 };
 
+export type AzureOCRAnalyzeResult = {
+    readResults: AzureOCRReadResult[];
+};
+
 export type AzureOCRResponse = {
-    readResult?: {
-        blocks?: AzureOCRBlock[];
-    };
+    status: string;
+    analyzeResult?: AzureOCRAnalyzeResult;
 };

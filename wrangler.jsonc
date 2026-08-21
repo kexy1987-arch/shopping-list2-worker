@@ -6,7 +6,7 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"compatibility_date": "2026-08-05",
 	"name": "shopping-list2-worker",
-	"main": "src/index.ts",	
+	"main": "src/index.ts",
 	"observability": {
 		"enabled": true
 	},
@@ -22,8 +22,9 @@
 		}
 	],
 	"vars": {
-		"SUPABASE_URL": "https://isdtokzfuppyibdyevtu.supabase.co",
-		"SUPABASE_BUCKET": "white-stone-userimg"
+		"AZURE_API": "https://kexy1987.cognitiveservices.azure.com",
+		"SUPABASE_BUCKET": "white-stone-userimg",
+		"SUPABASE_URL": "https://isdtokzfuppyibdyevtu.supabase.co"
 	}
 	/**
 	 * Smart Placement
