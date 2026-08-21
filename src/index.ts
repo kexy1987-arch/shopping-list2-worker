@@ -53,7 +53,7 @@ app.post("/update-product", async (c) => {
   const category = form.get("category")?.toString();
   const store = form.get("store")?.toString();
   const description = form.get("description")?.toString();
-  const barcode = form.get("barcode")?.toString();
+  const barcode = form.get("barcode")?.toString() || "";
   const image = form.get("image") as File | null;
   const country = form.get("country");
 
@@ -520,9 +520,11 @@ app.post("/acureocr", async (c) => {
       }
 
       if ( result ){
-        const lines = result.analyzeResult?.readResults?.flatMap(b =>
-          b.lines.map(l => l.text)
-        ) || [];
+        const lines =
+          result.analyzeResult?.readResults?.flatMap(r =>
+            r.lines.map(l => l.text)
+          ) || [];
+
 
         const text = lines.join("\n")
 
